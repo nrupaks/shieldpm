@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.shieldpm/
+*.tgz
+*.log
+.DS_Store
+coverage/
