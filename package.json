@@ -1,11 +1,16 @@
 {
-  "name": "shieldpm",
-  "version": "0.1.0",
+  "name": "@cyberhub/shieldpm",
+  "version": "0.4.0",
   "description": "Runtime-aware package firewall for Node.js — sandbox, monitor, and enforce least-privilege on every npm dependency",
   "license": "MIT",
   "author": "Nrupak Shah",
-  "repository": { "type": "git", "url": "https://github.com/nrupaks/shieldpm" },
-  "bin": { "shieldpm": "./dist/cli.js" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nrupaks/shieldpm"
+  },
+  "bin": {
+    "shieldpm": "./dist/cli.js"
+  },
   "main": "./dist/index.js",
   "type": "module",
   "scripts": {
@@ -14,11 +19,10 @@
     "test": "vitest",
     "lint": "eslint src/"
   },
-  "dependencies": {},
   "devDependencies": {
-    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
     "tsx": "^4.0.0",
-    "vitest": "^3.0.0",
-    "@types/node": "^22.0.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   }
 }

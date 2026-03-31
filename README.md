@@ -7,233 +7,226 @@
   ╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚═════╝ ╚═╝     ╚═╝     ╚═╝
 ```
 
-# ShieldPM
+# ShieldPM v0.4.0
 
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
-[![npm](https://img.shields.io/badge/npm-shieldpm-red.svg)](https://www.npmjs.com/package/shieldpm)
+**Runtime-aware package firewall + OWASP source code scanner for Node.js**
 
-**Runtime-aware package firewall for Node.js** — sandbox, monitor, and enforce least-privilege on every npm dependency.
-
-ShieldPM scans packages for malicious patterns, blocks typosquatting attempts, sandboxes install scripts, and enforces a permission manifest so your dependencies only access what you allow.
+Zero dependencies. 120+ security rules. OWASP Top 10 mapped. One command to scan.
 
 ---
 
-## Install
+## Why ShieldPM?
 
-```bash
-npm install -g shieldpm
-```
+Every npm install is a trust decision. ShieldPM protects your project at **two levels**:
 
-Or use without installing:
+1. **Dependency Security** — Scans npm packages for malicious patterns, typosquatting, and supply chain attacks
+2. **Source Code Security** — Scans your own code for OWASP Top 10 vulnerabilities, hardcoded secrets, and insecure patterns
 
-```bash
-npx shieldpm audit
-```
+Unlike `npm audit` (which only checks known CVEs), ShieldPM performs **behavioral analysis** — detecting what packages actually *do*, not just what's been reported.
 
 ## Quick Start
 
 ```bash
-# Install a package with full protection (typosquat check + static analysis + sandbox)
-shieldpm install axios
+# Install globally
+npm install -g shieldpm
 
-# Audit all current dependencies for risks
-shieldpm audit
+# Scan your source code for vulnerabilities
+shieldpm scan
 
-# Deep audit with per-finding detail
+# Scan with fix suggestions
+shieldpm scan --fix
+
+# Show OWASP Top 10 coverage report
+shieldpm scan --owasp-report
+
+# Audit npm dependencies
 shieldpm audit --deep
 
-# Inspect what a specific package actually does
-shieldpm inspect lodash
+# Generate full HTML security report
+shieldpm report
 
-# Run any command in a sandboxed environment (no network, stripped env)
-shieldpm sandbox node scripts/postinstall.js
-
-# Auto-generate a permission manifest from your dependencies
-shieldpm manifest generate
-
-# Show what changed in your dependency tree since last commit
-shieldpm diff
+# Generate SBOM (CycloneDX or SPDX)
+shieldpm sbom --format=cyclonedx --output=sbom.json
 ```
 
-## What It Does
+## Features
 
-### Static Analysis Engine
-Scans every `.js`/`.ts` file in a package for:
-- **Code execution**: `eval()`, `Function()`, `vm.runInContext()`
-- **Process spawning**: `child_process`, `exec`, `spawn`
-- **Network access**: `http.request`, `fetch()`, `dns.lookup`, `WebSocket`
-- **File system access**: reads/writes to sensitive paths (`/etc/passwd`, `~/.ssh`, `~/.npmrc`)
-- **Environment exfiltration**: `JSON.stringify(process.env)`
-- **Obfuscation**: `String.fromCharCode`, hex escape sequences, base64 decode
-- **Prototype pollution**: `__proto__` access, `constructor.prototype`
-- **Install scripts**: `preinstall`/`postinstall` scripts
+### Source Code Scanner (NEW in v0.4.0)
+| Feature | Description |
+|---------|-------------|
+| **120+ Security Rules** | Pattern-based detection across all OWASP Top 10 categories |
+| **OWASP Top 10 2021 Mapping** | Every rule mapped to an OWASP category |
+| **CWE ID Mapping** | Every rule mapped to a CWE identifier |
+| **Fix Suggestions** | Actionable remediation for every finding |
+| **False Positive Guidance** | When each rule may not apply |
+| **Confidence Levels** | High/medium/low confidence per finding |
+| **Secrets Detection** | AWS keys, GitHub tokens, Stripe keys, database URLs, private keys |
+| **Framework-Specific Rules** | React, Next.js, TypeScript, Node.js patterns |
+| **OWASP Coverage Report** | Shows coverage per category with compliance score |
+| **CWE Coverage Matrix** | All CWEs covered with rule counts |
+| **.shieldpmignore** | Exclude files/directories from scanning |
 
-Each package gets a **risk score from 0-10** with detailed findings.
+### Dependency Security
+| Feature | Description |
+|---------|-------------|
+| **Static Analysis** | 30+ patterns for malicious behavior in dependencies |
+| **Typosquatting Detection** | Catches misspelled package names |
+| **Sandboxed Install Scripts** | Runs postinstall in restricted environment |
+| **Permission Manifest** | Per-package least-privilege access control |
+| **Behavioral Fingerprinting** | SHA-256 profiles to detect supply chain changes |
+| **Dependency Diff** | Red flags on lockfile changes |
 
-### Typosquatting Detection
-Checks package names against the top npm packages using:
-- Levenshtein distance (edit distance <= 2)
-- Character transposition (`exprses` vs `express`)
-- Hyphen/underscore/dot confusion (`lo-dash` vs `lodash`)
-- Scope confusion (`@tyeps/react` vs `@types/react`)
-- Repeated/missing characters (`expresss`, `expres`)
-
-### Sandboxed Execution
-Runs postinstall scripts and arbitrary commands in a restricted environment:
-- **Network blocked** via proxy redirection
-- **Environment stripped** (only PATH, HOME, NODE_ENV pass through)
-- **Sensitive vars removed** (AWS keys, tokens, database URLs)
-- **30-second timeout** with kill
-- Full stdout/stderr capture
-
-### Permission Manifest
-Define exactly what each dependency is allowed to do in `shieldpm.json`:
-
-```json
-{
-  "version": 1,
-  "permissions": {
-    "axios": { "net": ["*.api.example.com"], "fs": false },
-    "lodash": { "net": false, "fs": false },
-    "sharp": { "fs": ["./uploads", "./cache"], "net": false, "native": true }
-  }
-}
-```
-
-Auto-generate it with `shieldpm manifest generate`, then review and tighten.
-
-### Behavioral Fingerprinting
-Creates a cryptographic profile of each package:
-- SHA-256 hash of all source files
-- Complete import/require graph
-- Network endpoints found in source
-- File paths accessed
-- Native module bindings
-
-Compare profiles across versions to detect supply chain attacks.
-
-### Dependency Diff
-Compare your dependency tree before and after changes:
-- New packages, removed packages, version bumps
-- Flags: new install scripts, new native modules, major version bumps, version downgrades
-- Works with `package-lock.json` via git history
-
-## Feature Comparison
-
-| Feature | ShieldPM | npm audit | Socket.dev |
-|---------|----------|-----------|------------|
-| Known vulnerability check | Planned | Yes | Yes |
-| Static code analysis | Yes | No | Yes |
-| Typosquatting detection | Yes | No | Yes |
-| Sandboxed install scripts | Yes | No | No |
-| Permission manifest | Yes | No | No |
-| Behavioral fingerprinting | Yes | No | Partial |
-| Dependency diff | Yes | No | Partial |
-| Runtime enforcement | Yes | No | No |
-| Free & open source | Yes | Yes | Freemium |
-| Zero dependencies | Yes | N/A | N/A |
+### Enterprise Features (v0.3.0+)
+| Feature | Description |
+|---------|-------------|
+| **SBOM Generation** | CycloneDX 1.5 and SPDX 2.3 formats |
+| **License Compliance** | Detect, classify, and enforce license policies |
+| **Policy-as-Code** | Declarative security rules in JSON |
+| **Allow/Deny Lists** | Centralized package governance |
+| **Compliance Reporting** | SOC2, ISO 27001, PCI-DSS, EO 14028 controls |
+| **CI/CD Integration** | GitHub Actions, GitLab CI, Azure DevOps generators |
+| **Pre-commit Hook** | Auto-scan on dependency changes |
+| **PR Decoration** | Markdown security reports for pull requests |
+| **Break-the-Build Gate** | Configurable CI/CD pass/fail thresholds |
+| **Provenance Verification** | npm provenance and Sigstore checks |
+| **Maintainer Risk Scoring** | Bus factor and trust signal analysis |
+| **Patch Suggestions** | Alternative packages and remediation actions |
+| **Continuous Monitoring** | Lockfile drift and risk score tracking |
+| **Security Posture Trending** | Track improvement over time |
+| **HTML Report** | Beautiful tabbed report covering all modules |
 
 ## Architecture
 
 ```
-shieldpm
-├── src/
-│   ├── cli.ts                    # CLI entry point (process.argv parsing)
-│   ├── index.ts                  # Public API exports
-│   ├── analyzer/
-│   │   ├── static.ts             # Pattern-based static analysis engine
-│   │   └── typosquat.ts          # Typosquatting detection (Levenshtein + heuristics)
-│   ├── sandbox/
-│   │   └── runner.ts             # Restricted process execution
-│   ├── monitor/
-│   │   └── permissions.ts        # shieldpm.json manifest load/validate/generate
-│   ├── fingerprint/
-│   │   └── profile.ts            # Behavioral profiling and diff
-│   ├── diff/
-│   │   └── dependency.ts         # package-lock.json diff engine
-│   └── utils/
-│       ├── colors.ts             # ANSI terminal colors (zero deps)
-│       └── logger.ts             # Leveled logger
-├── package.json
-├── tsconfig.json
-└── shieldpm.json                 # (generated) permission manifest
+shieldpm/src/
+├── cli.ts                    CLI entry point (30+ commands)
+├── index.ts                  Public API exports
+├── scanner/                  Source Code Scanner (NEW)
+│   ├── patterns.ts           120+ OWASP-mapped rules
+│   ├── engine.ts             Scan engine with dedup & summary
+│   └── owasp-report.ts       Coverage report & compliance scoring
+├── analyzer/
+│   ├── static.ts             Dependency static analysis (30+ rules)
+│   └── typosquat.ts          Package name similarity detection
+├── sandbox/
+│   └── runner.ts             Sandboxed command execution
+├── monitor/
+│   └── permissions.ts        Permission manifest system
+├── fingerprint/
+│   └── profile.ts            Behavioral fingerprinting
+├── diff/
+│   └── dependency.ts         Lockfile diffing
+├── allowlist/
+│   └── index.ts              Community-maintained safe list
+├── sbom/
+│   └── generator.ts          CycloneDX & SPDX SBOM generation
+├── license/
+│   └── compliance.ts         License detection & policy enforcement
+├── policy/
+│   └── engine.ts             Policy-as-code rule engine
+├── gateway/
+│   └── lists.ts              Allow/deny package management
+├── compliance/
+│   └── reporter.ts           SOC2, ISO 27001, PCI-DSS, EO 14028
+├── cicd/
+│   └── integration.ts        CI/CD, pre-commit, PR decoration, gate
+├── provenance/
+│   └── verifier.ts           Package provenance verification
+├── maintainer/
+│   └── risk.ts               Maintainer trust scoring
+├── remediation/
+│   └── patches.ts            Patch suggestions & alternatives
+├── monitoring/
+│   └── watcher.ts            Continuous dependency monitoring
+├── posture/
+│   └── trending.ts           Security posture snapshots & trends
+├── report/
+│   └── html.ts               Interactive HTML report generator
+└── utils/
+    ├── colors.ts             Terminal colors (zero-dep)
+    └── logger.ts             Leveled logging
 ```
 
-## CLI Reference
+**Zero production dependencies.** Built with Node.js core modules only.
 
-```
-shieldpm install <package>       Install with protection (typosquat + analysis + sandbox)
-shieldpm audit                   Audit current dependencies
-shieldpm audit --deep            Deep audit with per-finding detail
-shieldpm inspect <package>       Show what a package does
-shieldpm sandbox <command>       Run command in sandbox
-shieldpm manifest generate       Auto-generate permission manifest
-shieldpm manifest enforce        Validate manifest coverage
-shieldpm diff                    Show dependency changes since last commit
-shieldpm help                    Show help
-shieldpm version                 Show version
+## Configuration Files
 
-Options:
-  --verbose                      Enable debug logging
-  --no-color                     Disable colored output
-  --json                         Machine-readable output
-  --force                        Bypass typosquatting blocks
-```
+| File | Purpose | Command to Create |
+|------|---------|-------------------|
+| `shieldpm.json` | Permission manifest (per-package access rules) | `shieldpm manifest generate` |
+| `shieldpm-policy.json` | Security policy (declarative rules) | `shieldpm policy init` |
+| `shieldpm-lists.json` | Package allow/deny lists | `shieldpm lists allow <pkg>` |
+| `.shieldpmignore` | Exclude files/dirs from source scan | Create manually (gitignore syntax) |
 
-## Permission Manifest Reference
+## Programmatic API
 
-The `shieldpm.json` file controls what each dependency is allowed to do:
+```typescript
+import {
+  // Source code scanning
+  scanProject, generateOWASPReport, ALL_RULES,
+  // Dependency analysis
+  analyzePackage, checkTyposquatting, runSandboxed,
+  // SBOM & compliance
+  generateSBOM, scanLicenses, generateComplianceReport,
+  // Policy & governance
+  evaluatePolicy, checkPackage, evaluateGate,
+} from 'shieldpm';
 
-```json
-{
-  "version": 1,
-  "permissions": {
-    "<package-name>": {
-      "net": ["<glob-pattern>"] | false,
-      "fs": ["<path>"] | false,
-      "native": true | false,
-      "exec": true | false,
-      "env": ["<VAR_NAME>"] | true | false
-    }
-  }
-}
+// Scan project source code
+const report = await scanProject({ dir: './src' });
+console.log(`Found ${report.summary.totalFindings} issues`);
+
+// Generate OWASP coverage report
+const owasp = generateOWASPReport(report);
+console.log(`OWASP compliance: ${owasp.overallScore}/100`);
+
+// Analyze a dependency
+const risk = await analyzePackage('./node_modules/some-package');
+console.log(`Risk score: ${risk.score}/10`);
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `net` | `string[] \| false` | Allowed network destinations (glob). `false` = no network. |
-| `fs` | `string[] \| false` | Allowed filesystem paths. `false` = no fs access. |
-| `native` | `boolean` | Whether native C++ addons are allowed. |
-| `exec` | `boolean` | Whether `child_process` is allowed. |
-| `env` | `string[] \| boolean` | Allowed env vars, `true` = all, `false` = none. |
+## What Does ShieldPM Scan For?
 
-## Contributing
+See [SCAN-COVERAGE.md](./SCAN-COVERAGE.md) for the complete list of 120+ rules with OWASP mapping, CWE IDs, and code examples.
 
-Contributions are welcome! This is a free, open-source project.
+**OWASP Top 10 Coverage Summary:**
+- **A01 Broken Access Control** — Path traversal, CORS, IDOR, privilege escalation, JWT issues
+- **A02 Cryptographic Failures** — Weak hashes, hardcoded keys, insecure ciphers, TLS bypass
+- **A03 Injection** — SQL, NoSQL, command, LDAP, XPath, header, log, eval, template injection
+- **A04 Insecure Design** — Race conditions, missing rate limiting, hardcoded credentials
+- **A05 Security Misconfiguration** — Debug mode, verbose errors, exposed env files, stack traces
+- **A06 Vulnerable Components** — Known compromised packages, deprecated APIs, wildcard versions
+- **A07 Authentication Failures** — Hardcoded passwords, weak policy, session fixation, JWT attacks
+- **A08 Software Integrity** — Eval from network, CDN without SRI, prototype pollution
+- **A09 Logging Failures** — Sensitive data in logs, empty catches, missing audit trails
+- **A10 SSRF** — Fetch/axios/http with user URLs, DNS rebinding, internal IP access
 
-1. Fork the repository
-2. Create your feature branch: `git checkout -b feature/my-feature`
-3. Make your changes
-4. Run tests: `npm test`
-5. Build: `npm run build`
-6. Submit a pull request
+**Plus:** TypeScript patterns, React/Next.js XSS, Node.js API security, secrets detection, dependency confusion
 
-### Development
+## Full Command Reference
+
+See [COMMANDS.md](./COMMANDS.md) for all 30+ commands with examples and flags.
+
+## CI/CD Integration
 
 ```bash
-git clone https://github.com/nrupaks/shieldpm.git
-cd shieldpm
-npm install
-npm run dev -- help       # Run CLI in development mode
-npm run build             # Compile TypeScript
-npm test                  # Run tests
+# Generate GitHub Actions workflow
+shieldpm cicd setup github-actions
+
+# Install pre-commit hook
+shieldpm hook install
+
+# Run as CI gate (exits non-zero on failure)
+shieldpm gate --max-risk-score=7 --max-critical=0
+shieldpm scan --severity=high
 ```
-
-## Built with Claude
-
-This project was built with [Claude](https://claude.ai) by Anthropic.
 
 ## License
 
-[MIT](LICENSE) - Nrupak Shah
+MIT — Nrupak Shah
+
+## Links
+
+- [Full Command Reference](./COMMANDS.md)
+- [Scan Coverage & OWASP Mapping](./SCAN-COVERAGE.md)
+- [GitHub](https://github.com/nrupaks/shieldpm)
